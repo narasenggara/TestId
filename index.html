@@ -11,6 +11,7 @@
     table { margin-top: 20px; border-collapse: collapse; width: 100%; }
     td, th { border: 1px solid #666; padding: 6px; text-align: left; }
     #status { margin-top: 10px; font-weight: bold; }
+    #raw { margin-top:20px; white-space: pre-wrap; background:#f4f4f4; padding:10px; border:1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -19,7 +20,7 @@
   <img id="preview" alt="Preview Foto"><br>
   <div id="status"></div>
 
-  <h3>Hasil OCR:</h3>
+  <h3>Hasil Parsing:</h3>
   <table>
     <tr><th>NIK</th><td id="nik"></td></tr>
     <tr><th>Nama</th><td id="nama"></td></tr>
@@ -36,10 +37,14 @@
     <tr><th>Kota</th><td id="kota"></td></tr>
   </table>
 
+  <h3>Hasil OCR Mentah:</h3>
+  <div id="raw"></div>
+
   <script>
     const upload = document.getElementById('upload');
     const preview = document.getElementById('preview');
     const statusEl = document.getElementById('status');
+    const rawBox = document.getElementById('raw');
 
     upload.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -58,6 +63,7 @@
           );
           
           statusEl.innerText = "Selesai!";
+          rawBox.innerText = text; // tampilkan hasil mentah
           parseKTP(text);
 
         } catch (err) {
@@ -70,7 +76,6 @@
     function parseKTP(raw) {
       const clean = raw.replace(/\s+/g, " ").toUpperCase();
 
-      // regex extract
       const nik = (clean.match(/\b\d{16}\b/)||[""])[0];
       const nama = (clean.match(/NAMA[: ]([A-Z ]+)/)||["",""])[1];
       const ttl = (clean.match(/TEMPAT\/TGL LAHIR[: ]([A-Z ]+), (\d{2}-\d{2}-\d{4})/)||["","",""]);
@@ -83,7 +88,6 @@
       const wni = clean.includes("WNI") ? "WNI" : (clean.includes("WNA") ? "WNA" : "");
       const kota = (clean.match(/KOTA [A-Z ]+|KABUPATEN [A-Z ]+/)||[""])[0];
 
-      // isi tabel
       document.getElementById("nik").innerText = nik;
       document.getElementById("nama").innerText = nama;
       document.getElementById("tempat").innerText = ttl[1];
