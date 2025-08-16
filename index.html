@@ -1,285 +1,111 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OCR KTP – Parser Lengkap</title>
-
-  <!-- Tesseract.js -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR KTP</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;margin:0;padding:18px;background:#0f172a;color:#e5e7eb}
-    h1{margin:0 0 8px}
-    .card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px;margin-bottom:14px}
-    input[type=file]{padding:10px;background:#0b1327;border:1px solid #334155;border-radius:8px;color:#cbd5e1;width:100%}
-    img{max-width:100%;border-radius:10px;margin-top:10px;display:none}
-    pre{background:#0b1327;border:1px solid #334155;border-radius:10px;padding:10px;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}
-    .grid{display:grid;grid-template-columns:140px 1fr;gap:8px 12px}
-    .label{color:#94a3b8}
-    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    button{padding:8px 12px;border-radius:10px;border:1px solid #334155;background:#0b1327;color:#e5e7eb;cursor:pointer}
-    button:hover{background:#111827}
-    small{color:#94a3b8}
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #preview { max-width: 100%; margin-top: 10px; border: 1px solid #ccc; }
+    table { margin-top: 20px; border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #666; padding: 6px; text-align: left; }
   </style>
 </head>
 <body>
-  <h1>OCR KTP</h1>
+  <h2>Upload Foto KTP</h2>
+  <input type="file" id="upload" accept="image/*"><br>
+  <img id="preview" alt="Preview Foto"><br>
+  <div id="status"></div>
 
-  <div class="card">
-    <p><strong>Upload Foto KTP</strong> (disarankan jelas, tidak miring):</p>
-    <input id="file" type="file" accept="image/*" />
-    <img id="preview" alt="Preview KTP" />
-    <p id="log"><small>Menunggu gambar…</small></p>
-  </div>
+  <h3>Hasil OCR:</h3>
+  <table>
+    <tr><th>NIK</th><td id="nik"></td></tr>
+    <tr><th>Nama</th><td id="nama"></td></tr>
+    <tr><th>Tempat Lahir</th><td id="tempat"></td></tr>
+    <tr><th>Tanggal Lahir</th><td id="tgl"></td></tr>
+    <tr><th>Jenis Kelamin</th><td id="jk"></td></tr>
+    <tr><th>Alamat</th><td id="alamat"></td></tr>
+    <tr><th>RT</th><td id="rt"></td></tr>
+    <tr><th>RW</th><td id="rw"></td></tr>
+    <tr><th>Kel/Desa</th><td id="kel"></td></tr>
+    <tr><th>Kecamatan</th><td id="kec"></td></tr>
+    <tr><th>Pekerjaan</th><td id="pekerjaan"></td></tr>
+    <tr><th>Kewarganegaraan</th><td id="wni"></td></tr>
+    <tr><th>Kota</th><td id="kota"></td></tr>
+  </table>
 
-  <div class="card">
-    <h3 style="margin-top:0">Hasil OCR (mentah)</h3>
-    <pre id="raw">Teks OCR akan tampil di sini…</pre>
-  </div>
+  <script>
+    const upload = document.getElementById('upload');
+    const preview = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
 
-  <div class="card">
-    <h3 style="margin-top:0">Data Terstruktur</h3>
-    <div class="grid" id="out">
-      <div class="label">NIK</div><div data-k="nik">-</div>
-      <div class="label">Nama</div><div data-k="nama">-</div>
-      <div class="label">Tempat Lahir</div><div data-k="tempat">-</div>
-      <div class="label">Tanggal Lahir</div><div data-k="tanggal">-</div>
-      <div class="label">Jenis Kelamin</div><div data-k="jk">-</div>
-      <div class="label">Alamat</div><div data-k="alamat">-</div>
-      <div class="label">RT</div><div data-k="rt">-</div>
-      <div class="label">RW</div><div data-k="rw">-</div>
-      <div class="label">Kel/Desa</div><div data-k="kel">-</div>
-      <div class="label">Kecamatan</div><div data-k="kec">-</div>
-      <div class="label">Pekerjaan</div><div data-k="pekerjaan">-</div>
-      <div class="label">Kewarganegaraan</div><div data-k="wn">-</div>
-      <div class="label">Kota (kanan)</div><div data-k="kotaKanan">-</div>
-    </div>
-    <div class="actions">
-      <button id="copyText">Salin Text</button>
-      <button id="copyJSON">Salin JSON</button>
-      <button id="downloadCSV">Unduh CSV</button>
-    </div>
-    <p><small>Aturan kota kanan: jika baris hanya “BANDUNG” (tanpa “KOTA”/“KAB”), maka dioutput sebagai <em>Kab. Bandung</em>.</small></p>
-  </div>
+    upload.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-<script>
-const el = (sel) => document.querySelector(sel);
-const els = (sel) => Array.from(document.querySelectorAll(sel));
+      // tampilkan preview
+      const reader = new FileReader();
+      reader.onload = async function(ev) {
+        preview.src = ev.target.result;
+        statusEl.innerText = "Sedang membaca teks...";
 
-const preview = el('#preview');
-const raw = el('#raw');
-const logEl = el('#log');
-el('#file').addEventListener('change', e => {
-  const f = e.target.files && e.target.files[0];
-  if (!f) return;
-  // Preview pakai FileReader agar lebih kompatibel di Android/iOS
-  const reader = new FileReader();
-  reader.onload = ev => { preview.src = ev.target.result; preview.style.display = 'block'; };
-  reader.readAsDataURL(f);
-  runOCR(f);
-});
+        try {
+          const { data: { text } } = await Tesseract.recognize(
+            ev.target.result, 
+            'ind',
+            { logger: m => statusEl.innerText = m.status + " " + Math.round((m.progress||0)*100) + "%" }
+          );
+          
+          statusEl.innerText = "Selesai!";
+          parseKTP(text);
 
-function normalize(text){
-  return (text||'')
-    .replace(/\u00A0/g, ' ')          // nbsp -> spasi
-    .replace(/[|]/g, 'I')             // OCR sering ketuker | dan I
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\r/g, '')
-    .toUpperCase();
-}
-
-function getAfterColon(line){
-  const m = line.split(':');
-  if (m.length > 1) return m.slice(1).join(':').trim();
-  const m2 = line.split(/\s-\s/);
-  if (m2.length > 1) return m2.slice(1).join(' - ').trim();
-  return line.replace(/^[A-Z\/\.\s]+/, '').trim();
-}
-
-function findValue(lines, labels){
-  const re = new RegExp(`^(?:${labels.join('|')})\\b.*`, 'i');
-  for (const L of lines){
-    if (re.test(L)) return getAfterColon(L);
-  }
-  return '';
-}
-
-function findNik(text){
-  // Utama: cari baris NIK
-  const byLabel = text.match(/NIK[^0-9]*([0-9]{16})/i);
-  if (byLabel) return byLabel[1];
-  // Fallback: cari 16 digit di mana pun
-  const any16 = text.match(/\b([0-9]{16})\b/);
-  return any16 ? any16[1] : '';
-}
-
-function parseRT_RW(lines){
-  // Contoh: "RT/RW : 008/001" atau "RT/RW 008/001"
-  for (const L of lines){
-    const m = L.match(/RT\s*\/\s*RW\s*[:\-]?\s*([0-9O]{1,3})\s*\/\s*([0-9O]{1,3})/i);
-    if (m){
-      // ganti O yang sering salah jadi 0
-      const toNum = s => s.replace(/O/g,'0');
-      return { rt: toNum(m[1].padStart(3,'0')), rw: toNum(m[2].padStart(3,'0')) };
-    }
-  }
-  // Fallback kalau RT dan RW di baris terpisah
-  let rt = findValue(lines, ['RT']), rw = findValue(lines, ['RW']);
-  const fix = s => (s||'').replace(/[^0-9]/g,'').padStart(3,'0');
-  return { rt: fix(rt)||'', rw: fix(rw)||'' };
-}
-
-function parseTTL(value){
-  // value contoh: "BANDUNG, 31-08-1962"
-  let tempat = '', tanggal = '';
-  if (!value) return {tempat, tanggal};
-  const v = value.replace(/\s+/g,' ').trim();
-  const dateRxs = [
-    /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})/,
-    /(\d{1,2}\s+[A-Z]+?\s+\d{4})/,
-    /(\d{2}\-[A-Z]{3}\-\d{4})/
-  ];
-  for (const rx of dateRxs){
-    const m = v.match(rx);
-    if (m){
-      tanggal = m[1];
-      tempat = v.replace(m[1],'').replace(/[,;]$/,'').replace(/^[,;]\s*/,'').trim();
-      if (!tempat && v.includes(',')){ tempat = v.split(',')[0].trim(); }
-      return {tempat, tanggal};
-    }
-  }
-  // fallback split koma
-  if (v.includes(',')){
-    const [t1, ...rest] = v.split(',');
-    tempat = t1.trim(); tanggal = rest.join(',').trim();
-  } else { tempat = v.trim(); }
-  return {tempat, tanggal};
-}
-
-function detectKotaKanan(lines){
-  // Strategi:
-  // 1) Cari baris tanggal format dd-mm-yyyy; ambil baris sebelumnya sebagai kandidat kota kanan
-  // 2) Jika kandidat persis "BANDUNG" -> output "Kab. Bandung"
-  // 3) Jika kandidat mengandung "KOTA" / "KAB" -> gunakan apa adanya (formatkan kapitalisasi)
-  // 4) Fallback: cari baris yang persis "KOTA <NAMA>" atau "KAB <NAMA>"
-  const dateIdx = lines.findIndex(L => /\b\d{2}[\/\-]\d{2}[\/\-]\d{4}\b/.test(L));
-  const formatTitle = s => s.split(/\s+/).map(x=> x[0]+x.slice(1).toLowerCase()).join(' ');
-  let cand = '';
-  if (dateIdx > 0) cand = lines[dateIdx-1].trim();
-
-  function normalizeKota(s){
-    s = s.replace(/\s+/g,' ').trim();
-    if (!s) return '';
-    if (/^BANDUNG$/.test(s)) return 'Kab. Bandung';
-    if (/^KOTA\s+/.test(s)) return 'Kota ' + s.replace(/^KOTA\s+/,'').toUpperCase()
-      .split(' ').map(w=> w[0]+w.slice(1).toLowerCase()).join(' ');
-    if (/^KAB\.?\s+/.test(s)) return 'Kab. ' + s.replace(/^KAB\.?\s+/,'').toUpperCase()
-      .split(' ').map(w=> w[0]+w.slice(1).toLowerCase()).join(' ');
-    return ''; // bukan bentuk yang kita mau
-  }
-
-  let out = normalizeKota(cand);
-  if (out) return out;
-
-  // Coba pola eksplisit
-  for (const L of lines){
-    out = normalizeKota(L);
-    if (out) return out;
-  }
-  return ''; // jika tidak ditemukan
-}
-
-function parseAll(text){
-  const clean = normalize(text);
-  const lines = clean.split('\n').map(s=>s.trim()).filter(Boolean);
-
-  // Ambil nilai-nilai
-  const nik = findNik(clean);
-  const nama = findValue(lines, ['NAMA']);
-  const ttlRaw = findValue(lines, ['TEMPAT\\/TGL LAHIR','TEMPAT\\/?TANGGAL LAHIR','TPT\\/TGL LAHIR','TTL']);
-  const { tempat, tanggal } = parseTTL(ttlRaw);
-
-  let jk = findValue(lines, ['JENIS KELAMIN','JK']);
-  if (/LAKI/.test(jk)) jk = 'LAKI-LAKI';
-  else if (/PEREMPUAN|WANITA|PR/.test(jk)) jk = 'PEREMPUAN';
-
-  const alamat = findValue(lines, ['ALAMAT']);
-
-  const { rt, rw } = parseRT_RW(lines);
-
-  const kel = findValue(lines, ['KEL\\/?DESA','KELURAHAN','DESA']);
-  const kec = findValue(lines, ['KECAMATAN','KEC\\b']);
-
-  const pekerjaan = findValue(lines, ['PEKERJAAN']);
-  const wn = findValue(lines, ['KEWARGANEGARAAN','KEWARGANEGARAAN\\s*\\/\\s*WARGA']);
-  
-  const kotaKanan = detectKotaKanan(lines);
-
-  return { nik, nama, tempat, tanggal, jk, alamat, rt, rw, kel, kec, pekerjaan, wn, kotaKanan, raw: clean };
-}
-
-async function runOCR(file){
-  raw.textContent = 'Memproses OCR...';
-  logEl.innerHTML = '<small>Menjalankan Tesseract (lebih cepat pakai ENG, lalu parsing Indonesia)...</small>';
-
-  try{
-    // Lebih ringan di HP: mulai dari ENG
-    const { data:{ text } } = await Tesseract.recognize(file, 'eng', {
-      logger: m => { logEl.textContent = (m.status||'') + ' ' + Math.round((m.progress||0)*100) + '%'; }
+        } catch (err) {
+          statusEl.innerText = "OCR Error: " + err.message;
+        }
+      };
+      reader.readAsDataURL(file);
     });
-    raw.textContent = text || '(Tidak ada teks terbaca)';
-    const parsed = parseAll(text);
 
-    // Jika hasil terlalu kosong, coba ulang dengan 'ind' sebagai fallback
-    const needFallback = !parsed.nama && !parsed.nik;
-    if (needFallback){
-      logEl.textContent = 'Coba model bahasa Indonesia…';
-      const { data:{ text: textInd } } = await Tesseract.recognize(file, 'ind', {
-        logger: m => { logEl.textContent = (m.status||'') + ' ' + Math.round((m.progress||0)*100) + '%'; }
-      });
-      raw.textContent = textInd || text || '(Tidak ada teks terbaca)';
-      Object.assign(parsed, parseAll(textInd));
+    function parseKTP(raw) {
+      const lines = raw.split("\n").map(l => l.trim()).filter(l => l);
+
+      function getLine(key) {
+        return lines.find(l => l.toUpperCase().includes(key)) || "";
+      }
+
+      document.getElementById("nik").innerText = getLine("NIK").replace(/NIK[: ]?/i, "");
+      document.getElementById("nama").innerText = getLine("NAMA").replace(/NAMA[: ]?/i, "");
+
+      const ttl = getLine("TEMPAT").replace(/TEMPAT.?TGL.?LAHIR[: ]?/i,"");
+      if (ttl.includes(",")) {
+        const [t, d] = ttl.split(",");
+        document.getElementById("tempat").innerText = t.trim();
+        document.getElementById("tgl").innerText = d.trim();
+      }
+
+      document.getElementById("jk").innerText = getLine("KELAMIN").replace(/JENIS KELAMIN[: ]?/i,"");
+      document.getElementById("alamat").innerText = getLine("ALAMAT").replace(/ALAMAT[: ]?/i,"");
+
+      const rtrw = getLine("RT");
+      if (rtrw.includes("/")) {
+        const [rt, rw] = rtrw.split("/");
+        document.getElementById("rt").innerText = rt.replace(/\D/g,"");
+        document.getElementById("rw").innerText = rw.replace(/\D/g,"");
+      }
+
+      document.getElementById("kel").innerText = getLine("KEL").replace(/KEL.?DESA[: ]?/i,"");
+      document.getElementById("kec").innerText = getLine("KECAMATAN").replace(/KECAMATAN[: ]?/i,"");
+      document.getElementById("pekerjaan").innerText = getLine("PEKERJAAN").replace(/PEKERJAAN[: ]?/i,"");
+      document.getElementById("wni").innerText = getLine("WNI") ? "WNI" : "";
+
+      const kota = lines.find(l => l.toUpperCase().includes("KOTA") || l.toUpperCase().includes("BANDUNG"));
+      if (kota && kota.toUpperCase().includes("KOTA")) {
+        document.getElementById("kota").innerText = kota;
+      } else if (kota) {
+        document.getElementById("kota").innerText = "Kab. " + kota;
+      }
     }
-
-    // Tampilkan
-    const map = {
-      nik:'NIK', nama:'Nama', tempat:'Tempat Lahir', tanggal:'Tanggal Lahir',
-      jk:'Jenis Kelamin', alamat:'Alamat', rt:'RT', rw:'RW',
-      kel:'Kel/Desa', kec:'Kecamatan', pekerjaan:'Pekerjaan',
-      wn:'Kewarganegaraan', kotaKanan:'Kota (kanan)'
-    };
-    for (const k in map){
-      el(`[data-k="${k}"]`).textContent = parsed[k] || '-';
-    }
-
-    // Tombol salin/unduh
-    const toCSV = (o)=> {
-      const headers = Object.values(map).join(',');
-      const row = Object.keys(map).map(k => `"${(o[k]||'').replace(/"/g,'""')}"`).join(',');
-      return headers + '\n' + row + '\n';
-    };
-    el('#copyText').onclick = () => {
-      const lines = Object.keys(map).map(k => `${map[k]}: ${el(`[data-k="${k}"]`).textContent}`).join('\n');
-      navigator.clipboard.writeText(lines);
-    };
-    el('#copyJSON').onclick = () => {
-      const o = {}; for (const k in map) o[map[k]] = el(`[data-k="${k}"]`).textContent;
-      navigator.clipboard.writeText(JSON.stringify(o, null, 2));
-    };
-    el('#downloadCSV').onclick = () => {
-      const o = {}; for (const k in map) o[k] = el(`[data-k="${k}"]`).textContent;
-      const blob = new Blob([toCSV(o)], {type:'text/csv'});
-      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'hasil_ktp.csv' });
-      a.click();
-    };
-
-    logEl.innerHTML = '<small>Selesai.</small>';
-  } catch(err){
-    raw.textContent = 'Error OCR: ' + err.message;
-    logEl.textContent = 'Gagal memproses.';
-  }
-}
-</script>
+  </script>
 </body>
 </html>
