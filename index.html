@@ -13,37 +13,15 @@
   <meta name="theme-color" content="#0f172a">
 
   <style>
-    body {
-      font-family: system-ui, Arial, sans-serif;
-      margin:0; padding:20px;
-      background:#0f172a; color:#e2e8f0;
-    }
+    body { font-family: system-ui, Arial, sans-serif; margin:0; padding:20px;
+           background:#0f172a; color:#e2e8f0; }
     h1 { margin-bottom:10px; }
-    .card {
-      background:#1e293b;
-      padding:16px;
-      border-radius:14px;
-      margin-bottom:16px;
-    }
-    button {
-      padding:10px 16px;
-      border:none;
-      border-radius:8px;
-      background:#2563eb;
-      color:white;
-      cursor:pointer;
-    }
+    .card { background:#1e293b; padding:16px; border-radius:14px; margin-bottom:16px; }
+    button { padding:10px 16px; border:none; border-radius:8px; background:#2563eb; color:white; cursor:pointer; }
     button:hover { background:#1d4ed8; }
-    img { max-width:100%; margin-top:12px; border-radius:8px; }
-    pre {
-      background:#0b1327;
-      padding:10px;
-      border-radius:8px;
-      white-space:pre-wrap;
-      word-break:break-word;
-      max-height:250px;
-      overflow:auto;
-    }
+    img { max-width:100%; margin-top:12px; border-radius:8px; display:none; }
+    pre { background:#0b1327; padding:10px; border-radius:8px; white-space:pre-wrap;
+          word-break:break-word; max-height:250px; overflow:auto; }
     .kv { display:grid; grid-template-columns: 130px 1fr; gap:6px 10px; margin-top:10px; }
     .label { color:#94a3b8; }
   </style>
@@ -77,24 +55,44 @@
 
   <script>
     const input = document.getElementById("file");
+    const preview = document.getElementById("preview");
+    const raw = document.getElementById("raw");
+    const log = document.getElementById("log");
 
-    input.addEventListener("change", e=>{
-      if(e.target.files[0]) processFile(e.target.files[0]);
+    input.addEventListener("change", e => {
+      if(e.target.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          preview.src = ev.target.result;
+          preview.style.display = "block";
+        };
+        reader.readAsDataURL(e.target.files[0]);
+        processFile(e.target.files[0]);
+      }
     });
 
     function processFile(file){
-      document.getElementById("preview").src = URL.createObjectURL(file);
-      document.getElementById("raw").textContent = "Memproses OCR...";
-      Tesseract.recognize(file, 'ind', { logger:m=> {
-        document.getElementById("log").textContent = m.status + " " + Math.round((m.progress||0)*100) + "%";
-      }}).then(({ data:{ text }})=>{
-        document.getElementById("raw").textContent = text;
+      raw.textContent = "Sedang memproses OCR...";
+      log.textContent = "Menjalankan Tesseract...";
+
+      Tesseract.recognize(file, 'eng', {
+        logger: m => {
+          if(m.status === "recognizing text"){
+            log.textContent = "Sedang membaca teks: " + Math.round(m.progress*100) + "%";
+          } else {
+            log.textContent = m.status;
+          }
+        }
+      }).then(({ data:{ text }})=>{
+        raw.textContent = text || "(Tidak ada teks terbaca)";
         parseData(text);
+      }).catch(err=>{
+        raw.textContent = "Error OCR: " + err.message;
       });
     }
 
     function parseData(text){
-      let clean = text.toUpperCase();
+      let clean = (text || "").toUpperCase();
       const match = (regex)=> (clean.match(regex)||[])[1] || "-";
 
       document.getElementById("nama").textContent = match(/NAMA\\s*:?\\s*(.*)/);
