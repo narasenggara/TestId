@@ -10,6 +10,7 @@
     #preview { max-width: 100%; margin-top: 10px; border: 1px solid #ccc; }
     table { margin-top: 20px; border-collapse: collapse; width: 100%; }
     td, th { border: 1px solid #666; padding: 6px; text-align: left; }
+    #status { margin-top: 10px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -44,7 +45,6 @@
       const file = e.target.files[0];
       if (!file) return;
 
-      // tampilkan preview
       const reader = new FileReader();
       reader.onload = async function(ev) {
         preview.src = ev.target.result;
@@ -68,43 +68,35 @@
     });
 
     function parseKTP(raw) {
-      const lines = raw.split("\n").map(l => l.trim()).filter(l => l);
+      const clean = raw.replace(/\s+/g, " ").toUpperCase();
 
-      function getLine(key) {
-        return lines.find(l => l.toUpperCase().includes(key)) || "";
-      }
+      // regex extract
+      const nik = (clean.match(/\b\d{16}\b/)||[""])[0];
+      const nama = (clean.match(/NAMA[: ]([A-Z ]+)/)||["",""])[1];
+      const ttl = (clean.match(/TEMPAT\/TGL LAHIR[: ]([A-Z ]+), (\d{2}-\d{2}-\d{4})/)||["","",""]);
+      const jk = (clean.match(/JENIS KELAMIN[: ](LAKI-LAKI|PEREMPUAN)/)||["",""])[1];
+      const alamat = (clean.match(/ALAMAT[: ]([A-Z0-9 .\/-]+)/)||["",""])[1];
+      const rtrw = (clean.match(/RT ?(\d{1,3}) ?\/ ?RW ?(\d{1,3})/)||["","",""]);
+      const kel = (clean.match(/KEL\/DESA[: ]([A-Z ]+)/)||["",""])[1];
+      const kec = (clean.match(/KECAMATAN[: ]([A-Z ]+)/)||["",""])[1];
+      const pekerjaan = (clean.match(/PEKERJAAN[: ]([A-Z ]+)/)||["",""])[1];
+      const wni = clean.includes("WNI") ? "WNI" : (clean.includes("WNA") ? "WNA" : "");
+      const kota = (clean.match(/KOTA [A-Z ]+|KABUPATEN [A-Z ]+/)||[""])[0];
 
-      document.getElementById("nik").innerText = getLine("NIK").replace(/NIK[: ]?/i, "");
-      document.getElementById("nama").innerText = getLine("NAMA").replace(/NAMA[: ]?/i, "");
-
-      const ttl = getLine("TEMPAT").replace(/TEMPAT.?TGL.?LAHIR[: ]?/i,"");
-      if (ttl.includes(",")) {
-        const [t, d] = ttl.split(",");
-        document.getElementById("tempat").innerText = t.trim();
-        document.getElementById("tgl").innerText = d.trim();
-      }
-
-      document.getElementById("jk").innerText = getLine("KELAMIN").replace(/JENIS KELAMIN[: ]?/i,"");
-      document.getElementById("alamat").innerText = getLine("ALAMAT").replace(/ALAMAT[: ]?/i,"");
-
-      const rtrw = getLine("RT");
-      if (rtrw.includes("/")) {
-        const [rt, rw] = rtrw.split("/");
-        document.getElementById("rt").innerText = rt.replace(/\D/g,"");
-        document.getElementById("rw").innerText = rw.replace(/\D/g,"");
-      }
-
-      document.getElementById("kel").innerText = getLine("KEL").replace(/KEL.?DESA[: ]?/i,"");
-      document.getElementById("kec").innerText = getLine("KECAMATAN").replace(/KECAMATAN[: ]?/i,"");
-      document.getElementById("pekerjaan").innerText = getLine("PEKERJAAN").replace(/PEKERJAAN[: ]?/i,"");
-      document.getElementById("wni").innerText = getLine("WNI") ? "WNI" : "";
-
-      const kota = lines.find(l => l.toUpperCase().includes("KOTA") || l.toUpperCase().includes("BANDUNG"));
-      if (kota && kota.toUpperCase().includes("KOTA")) {
-        document.getElementById("kota").innerText = kota;
-      } else if (kota) {
-        document.getElementById("kota").innerText = "Kab. " + kota;
-      }
+      // isi tabel
+      document.getElementById("nik").innerText = nik;
+      document.getElementById("nama").innerText = nama;
+      document.getElementById("tempat").innerText = ttl[1];
+      document.getElementById("tgl").innerText = ttl[2];
+      document.getElementById("jk").innerText = jk;
+      document.getElementById("alamat").innerText = alamat;
+      document.getElementById("rt").innerText = rtrw[1];
+      document.getElementById("rw").innerText = rtrw[2];
+      document.getElementById("kel").innerText = kel;
+      document.getElementById("kec").innerText = kec;
+      document.getElementById("pekerjaan").innerText = pekerjaan;
+      document.getElementById("wni").innerText = wni;
+      document.getElementById("kota").innerText = kota;
     }
   </script>
 </body>
